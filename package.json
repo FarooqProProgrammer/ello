@@ -1,0 +1,24 @@
+{
+  "name": "eng-learn",
+  "private": true,
+  "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "db:up": "docker compose up -d postgres",
+    "db:generate": "turbo run db:generate",
+    "db:migrate": "pnpm --filter @repo/db db:migrate",
+    "db:seed": "pnpm --filter @repo/db db:seed",
+    "vapid": "node packages/jobs/scripts/vapid.mjs"
+  },
+  "devDependencies": {
+    "turbo": "^2.10.13",
+    "typescript": "catalog:"
+  }
+}

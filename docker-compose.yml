@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: englearn
+      POSTGRES_PASSWORD: englearn
+      POSTGRES_DB: englearn
+    ports:
+      # Host port 5433 avoids clashing with a locally installed Postgres on 5432.
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

@@ -1,0 +1,31 @@
+{
+  "name": "@repo/jobs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./functions": "./src/functions/index.ts"
+  },
+  "scripts": {
+    "dev": "inngest-cli dev -u http://localhost:3000/api/inngest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@repo/activities": "workspace:*",
+    "@repo/ai": "workspace:*",
+    "@repo/config": "workspace:*",
+    "@repo/core": "workspace:*",
+    "@repo/db": "workspace:*",
+    "inngest": "^4.20.0",
+    "web-push": "^3.6.7",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@repo/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/web-push": "^3.6.4",
+    "inngest-cli": "^1.44.0",
+    "typescript": "catalog:"
+  }
+}

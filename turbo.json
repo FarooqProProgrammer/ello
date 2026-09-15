@@ -1,0 +1,63 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "tui",
+  "globalEnv": [
+    "DATABASE_URL",
+    "APP_SECRET",
+    "INNGEST_DEV",
+    "INNGEST_BASE_URL",
+    "INNGEST_EVENT_KEY",
+    "INNGEST_SIGNING_KEY",
+    "VAPID_PUBLIC_KEY",
+    "VAPID_PRIVATE_KEY",
+    "VAPID_SUBJECT",
+    "BETTER_AUTH_SECRET",
+    "BETTER_AUTH_URL",
+    "GOOGLE_CLIENT_ID",
+    "GOOGLE_CLIENT_SECRET",
+    "ADMIN_EMAILS",
+    "FREE_DAILY_AI_REQUESTS",
+    "PRO_DAILY_AI_REQUESTS",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_PRICE_PRO",
+    "STRIPE_WEBHOOK_SECRET",
+    "ANTHROPIC_API_KEY",
+    "OPENAI_API_KEY",
+    "OPENAI_BASE_URL",
+    "AI_TUTOR",
+    "AI_GRADER",
+    "AI_GENERATOR",
+    "VOICE_PROVIDER"
+  ],
+  "tasks": {
+    "db:generate": {
+      "cache": false
+    },
+    "db:migrate": {
+      "cache": false,
+      "persistent": true
+    },
+    "db:seed": {
+      "cache": false
+    },
+    "build": {
+      "dependsOn": ["^build", "^db:generate"],
+      "outputs": [".next/**", "!.next/cache/**", "!.next/dev/**"]
+    },
+    "dev": {
+      "dependsOn": ["^db:generate"],
+      "cache": false,
+      "persistent": true
+    },
+    "lint": {
+      "dependsOn": ["^lint"]
+    },
+    "typecheck": {
+      "dependsOn": ["^typecheck", "^db:generate"]
+    },
+    "test": {
+      "dependsOn": ["^db:generate"],
+      "outputs": []
+    }
+  }
+}

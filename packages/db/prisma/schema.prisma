@@ -1,0 +1,350 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum CefrLevel {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+enum Goal {
+  CONVERSATION
+  BUSINESS
+  EXAM
+  PRONUNCIATION
+}
+
+enum Role {
+  USER
+  ASSISTANT
+}
+
+enum MistakeType {
+  GRAMMAR
+  VOCAB
+  PRONUNCIATION
+  SPELLING
+}
+
+enum SrsState {
+  NEW
+  LEARNING
+  REVIEW
+  RELEARNING
+}
+
+enum Skill {
+  SPEAKING
+  LISTENING
+  READING
+  WRITING
+  GRAMMAR
+  VOCAB
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  email              String?   @unique // null in single-user mode; filled when auth is added
+  name               String?
+  nativeLanguage     String? // ISO code, e.g. "ur"; null = English-only explanations
+  explainInNative    Boolean   @default(false)
+  cefrLevel          CefrLevel @default(A1)
+  goals              Goal[]
+  placementCompleted Boolean   @default(false)
+  voiceEnabled       Boolean   @default(true)
+  memoryEnabled      Boolean   @default(true)
+  reminderEnabled    Boolean   @default(false)
+  reminderTime       String    @default("20:00") // "HH:MM" on the half hour
+  timeZone           String    @default("Asia/Karachi")
+  lastReminderAt     DateTime?
+  // Accounts (Better Auth) & billing
+  emailVerified        Boolean   @default(false)
+  image                String?
+  role                 String    @default("user") // "user" | "admin"
+  plan                 String    @default("free") // "free" | "pro"
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?
+  planRenewsAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  sessions    ActivitySession[]
+  mistakes    Mistake[]
+  vocab       VocabItem[]
+  skillScores     SkillScore[]
+  aiSettings      AiSettings?
+  grammarLessons  GrammarLesson[]
+  grammarProgress GrammarProgress[]
+  scenarios       CustomScenario[]
+  memories        LearnerMemory[]
+  achievements    Achievement[]
+  pushSubscriptions PushSubscription[]
+  authSessions    Session[]
+  accounts        Account[]
+  aiUsage         AiUsage[]
+}
+
+// ---------- Better Auth models (names must stay session/account/verification) ----------
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+/// AI requests per user per UTC day, for plan limits.
+model AiUsage {
+  userId   String
+  day      String // YYYY-MM-DD (UTC)
+  requests Int    @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, day])
+}
+
+model Achievement {
+  userId        String
+  achievementId String
+  earnedAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, achievementId])
+}
+
+/// Web Push subscription for streak reminders (one per browser/device).
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Facts the AI remembers about the learner across chats (ChatGPT-style memory).
+model LearnerMemory {
+  id        String   @id @default(cuid())
+  userId    String
+  fact      String
+  source    String   @default("chat") // "chat" | "manual"
+  sessionId String?
+  messageId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+  @@index([userId, messageId])
+}
+
+/// Learner-written tutor role-play scenario.
+model CustomScenario {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, updatedAt])
+}
+
+/// AI-written lesson for a grammar topic, cached per learner and level.
+model GrammarLesson {
+  id        String    @id @default(cuid())
+  userId    String
+  topicId   String
+  level     CefrLevel
+  content   Json
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId, level])
+}
+
+model GrammarProgress {
+  userId          String
+  topicId         String
+  attempts        Int      @default(0)
+  mastery         Float    @default(0) // 0–100
+  lastPracticedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, topicId])
+}
+
+/// Per-user AI configuration from the Settings page; null fields fall back to .env.
+model AiSettings {
+  userId          String   @id
+  anthropicApiKey String? // encrypted with APP_SECRET
+  openaiApiKey    String? // encrypted with APP_SECRET
+  openaiBaseUrl   String?
+  tutorModel      String? // "provider:model"
+  graderModel     String?
+  generatorModel  String?
+  voiceProvider   String? // "openai" | "browser"
+  updatedAt       DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ActivitySession {
+  id         String    @id @default(cuid())
+  userId     String
+  activityId    String // "placement" | "tutor-chat" | "flashcards" ...
+  title         String?
+  topicId       String? // tutor chats: scenario id
+  focus         String? // tutor chats: practice focus
+  startedAt     DateTime  @default(now())
+  lastMessageAt DateTime  @default(now())
+  endedAt       DateTime?
+  score         Float?
+  data          Json? // activity-specific state, e.g. grammar practice exercises and answers
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+  mistakes Mistake[]
+
+  @@index([userId, activityId, startedAt])
+  @@index([userId, activityId, lastMessageAt])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  sessionId String
+  role      Role
+  content   String
+  analysis    Json? // learner messages: corrections, better version, new words, score
+  translation String? // translation into the learner's native language
+  explanation Json? // tutor replies: native-language explanation (summary + key phrases)
+  audioUrl  String?
+  createdAt DateTime @default(now())
+
+  session  ActivitySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  mistakes Mistake[]
+
+  @@index([sessionId, createdAt])
+}
+
+model Mistake {
+  id          String      @id @default(cuid())
+  userId      String
+  sessionId   String
+  messageId   String?
+  type        MistakeType
+  category    String // e.g. "past-simple", "articles"
+  original    String
+  corrected   String
+  explanation String
+  createdAt   DateTime    @default(now())
+  resolvedAt  DateTime? // "Mark as learned" in the mistake notebook; excluded from weak areas
+
+  user    User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session ActivitySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  message Message?        @relation(fields: [messageId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([messageId])
+}
+
+model VocabItem {
+  id            String    @id @default(cuid())
+  userId        String
+  term          String
+  definition    String
+  example       String?
+  partOfSpeech  String?
+  translation   String? // meaning in the learner's native language
+  usageNote     String? // when/how to use it, simple English
+  usageNative   String? // the same usage note in the native language
+  source        String // "tutor-chat" | "manual" | ...
+  createdAt     DateTime  @default(now())
+  // FSRS state
+  due           DateTime  @default(now())
+  stability     Float     @default(0)
+  difficulty    Float     @default(0)
+  scheduledDays Int       @default(0)
+  learningSteps Int       @default(0)
+  reps          Int       @default(0)
+  lapses        Int       @default(0)
+  state         SrsState  @default(NEW)
+  lastReview    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, term])
+  @@index([userId, due])
+}
+
+model SkillScore {
+  id         String    @id @default(cuid())
+  userId     String
+  skill      Skill
+  score      Float // 0–100
+  cefr       CefrLevel
+  recordedAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, skill, recordedAt])
+}
